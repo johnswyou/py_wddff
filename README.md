@@ -27,4 +27,4 @@ dwt_instance.modwt(atrous=False)
 
 # To compute Atrous
 dwt_instance.modwt(atrous=True)
-``
+```
