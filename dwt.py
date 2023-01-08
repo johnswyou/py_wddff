@@ -1,5 +1,7 @@
 from filters import scaling_filter
 import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+import pandas as pd
 
 class Dwt:
 
@@ -98,3 +100,38 @@ class Dwt:
 
         return W
 
+class DwtTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, wavelet, j, max_wavelet_length, max_j, atrous = False): # no *args or **kargs
+        
+        self.wavelet = wavelet
+        self.j = j
+        self.max_wavelet_length = max_wavelet_length
+        self.max_j = max_j
+        self.atrous = atrous
+        self.n_boundary_coefs = ((2**self.max_j) - 1) * (self.max_wavelet_length - 1) + 1 # See Eq. 10 in Basta [2014]
+
+    def fit(self, X):
+        assert isinstance(X, pd.DataFrame)
+        return self # do nothing
+
+    def transform(self, X):
+        assert isinstance(X, pd.DataFrame)
+
+        storage = [X]
+        
+        X_colnames = list(X.columns)
+
+        for i in range(len(X.columns)):
+            x = X.iloc[:, i].tolist()
+            dwt_instance = Dwt(x, self.wavelet, self.j)
+            x_post_dwt = dwt_instance.modwt(atrous=self.atrous)
+            ncols_x_post_dwt = x_post_dwt.shape[1]
+            x_colnames = ["v"+str(k) for k in range(1, ncols_x_post_dwt)] + ["w" + str(ncols_x_post_dwt)]
+            x_colnames = [X_colnames[i] + '_' + elem for elem in x_colnames]
+            df = pd.DataFrame(x_post_dwt, columns = x_colnames)
+            storage.append(df)
+
+        res = pd.concat(storage, axis=1)
+        res = res.iloc[self.n_boundary_coefs:] # Remove boundary coefficients
+        
+        return res
