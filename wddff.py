@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.pipeline import make_pipeline
-from utils import train_val_test_split
+from utils import train_val_test_split, normalize_train_val_test_X
 
-def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max_j = 6, atrous = False, lag_X = 14, lag_Y = 14):
+def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max_j = 6, atrous = False, lag_X = 14, lag_Y = 14, normalize = True):
 
     # X and y should have the same index!!!
 
@@ -43,7 +43,17 @@ def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max
 
     train_set, val_set, test_set = train_val_test_split(full_set)
 
-    X = full_set.drop('target', axis=1)
-    y = full_set[['target']]
+    X_train = train_set.drop('target', axis=1)
+    y_train = train_set[['target']]
 
+    X_val = val_set.drop('target', axis=1)
+    y_val = val_set[['target']]
 
+    X_test = test_set.drop('target', axis=1)
+    y_test = test_set[['target']]
+
+    # Normalize
+    if normalize:
+        X_train, X_val, X_test = normalize_train_val_test_X(X_train, X_val, X_test)
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
