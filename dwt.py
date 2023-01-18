@@ -1,17 +1,9 @@
 from filters import scaling_filter
 import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.utils.validation import check_array, check_X_y
+from sklearn.base import BaseEstimator, TransformerMixin, RegressorMixin
 import pandas as pd
-from sklearn.utils.validation import check_array, check_X_y, check_is_fitted
-from sklearn.base import RegressorMixin
 import itertools
-
-# Reference: https://stackoverflow.com/questions/18495098/python-check-if-an-object-is-a-list-of-strings
-def is_list_of_strings(lst):
-    if lst and isinstance(lst, list):
-        return all(isinstance(elem, str) for elem in lst)
-    else:
-        return False
 
 class Dwt:
 
@@ -111,12 +103,8 @@ class Dwt:
         return W
 
 class DwtTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, X_colnames, wavelet, j, max_wavelet_length, max_j, atrous = False, remove_boundary_coefs = True): # no *args or **kargs
-        
-        # X_colnames should be a string list containing names of columns of pandas data frame.
-        # You can obtain this using list(your_df.columns).
+    def __init__(self, wavelet, j, max_wavelet_length, max_j, atrous = False, remove_boundary_coefs = True): # no *args or **kargs
 
-        self.X_colnames = X_colnames
         self.wavelet = wavelet
         self.j = j
         self.max_wavelet_length = max_wavelet_length
@@ -124,94 +112,77 @@ class DwtTransformer(BaseEstimator, TransformerMixin):
         self.atrous = atrous
         self.remove_boundary_coefs = remove_boundary_coefs
 
-    def fit(self, X, y=None):
-        
+    def fit(self, X, y=None): # y is ignored
+
+        # Input validation
+
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError(f'X must be of type pd.DataFrame, not {type(X)}')
+
+        self.X_colnames = list(X) # list containing strings that denote each column in DataFrame X
         self.n_boundary_coefs = ((2**self.max_j) - 1) * (self.max_wavelet_length - 1) + 1 # See Eq. 10 in Basta [2014]
+
         return self
 
-    def transform(self, X, y=None):
-        
-        # Input validation
-        X = check_array(X)
-        assert len(self.X_colnames) == X.shape[1]    # An important check
-        assert is_list_of_strings(self.X_colnames)
+    def transform(self, X, y=None): # y is ignored
 
-        X = pd.DataFrame(X, columns=self.X_colnames) # Construct pandas data frame from ndarray X and self.X_colnames
+        # I assume .transform() is called immediately after .fit()
+
+        # The following: 
+        # 1. performs MODWT on every column of X and 
+        # 2. concatenates the new wavelet features to the original X.
 
         storage = [X]
-        # colnames_storage = [self.X_colnames]
-        n_cols = len(self.X_colnames)
 
-        # The following performs MODWT on every column of X and then concatenates the new wavelet
-        # features to the original X.
-
-        for i in range(n_cols):
+        for i in range(len(self.X_colnames)):
             x = X.iloc[:, i].tolist()                                                                     # take the ith column (time series) in X and convert to a list
-            # x = X[:, i].tolist() # OLD
             dwt_instance = Dwt(x, self.wavelet, self.j)
             x_post_dwt = dwt_instance.modwt(atrous=self.atrous)                                           # Perform MODWT on ith column of X
             ncols_x_post_dwt = x_post_dwt.shape[1]                                                        # This will always be self.j + 1
-            x_colnames = ["v"+str(k) for k in range(1, ncols_x_post_dwt)] + ["w" + str(ncols_x_post_dwt)] # Make column names
+            x_colnames = ["W"+str(k) for k in range(1, ncols_x_post_dwt)] + ["V" + str(ncols_x_post_dwt)] # Make column names
             x_colnames = [self.X_colnames[i] + '_' + elem for elem in x_colnames]                         # Make column names
             df = pd.DataFrame(x_post_dwt, columns = x_colnames)                                           # Convert ndarray to pandas data frame
             storage.append(df)
-            # colnames_storage.append(x_colnames) # OLD
-            # storage.append(x_post_dwt) # OLD
-
-        # Old
-        # assert len(storage) == len(colnames_storage) == (n_cols+1)
-        # df_storage = [pd.DataFrame(storage[i], columns = colnames_storage[i]) for i in range(n_cols+1)]
-        # res = pd.concat(df_storage, axis=1)
 
         res = pd.concat(storage, axis=1)
 
+        # Remove boundary coefficients
+
         if self.remove_boundary_coefs:
-            res = res.iloc[self.n_boundary_coefs:] # Remove boundary coefficients
+            res = res.iloc[self.n_boundary_coefs:]
         
         return res
 
 class LagTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, X_colnames, lag_X, lag_Y, include_lagged_Y = False):
+    def __init__(self, lag_X):
 
-        # NOTE: include_lagged_Y should be False when doing simulation!!!
-
-        # X_colnames should be a string list containing names of columns of pandas data frame.
-        # You can obtain this using list(your_df.columns).
-
-        self.X_colnames = X_colnames
         self.lag_X = lag_X
-        self.lag_Y = lag_Y
-        self.include_lagged_Y = include_lagged_Y
 
-    def fit(self, X, y=None):
-        # assert isinstance(X, pd.DataFrame)
+    def fit(self, X, y=None): # y is ignored
+        
+        # Input validation
+
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError(f'X must be of type pd.DataFrame, not {type(X)}')
+
+        self.X_colnames = list(X)
+
         return self
 
-    def transform(self, X, y=None):
+    def transform(self, X, y = None): # y is ignored
 
-        # Input validation
-        X = check_array(X)
-        assert len(self.X_colnames) == X.shape[1]
-        assert is_list_of_strings(self.X_colnames)
+        # I assume .transform() is called immediately after .fit()
 
-        # Construct pandas data frame from ndarray X and self.X_colnames
-        X = pd.DataFrame(X, columns=self.X_colnames)
+        new_X_colnames = [column_name + f'_lag{lag}' for column_name in self.X_colnames for lag in range(1, self.lag_X+1)]
+        new_X_columns = [X.loc[:, column_name].shift(lag) for column_name in self.X_colnames for lag in range(1, self.lag_X+1)]
+        df = pd.concat(new_X_columns, axis=1)
+        df.columns = new_X_colnames
 
-        # X_colnames_dict = {i:self.X_colnames[i] for i in range(len(self.X_colnames))}
+        lagged_X = pd.concat([X, df], axis=1)
+        lagged_X = lagged_X.iloc[self.lag_X:] # Remove NaN values
+        self.lagged_X = lagged_X
 
-        for column_name in self.X_colnames:
-            for lag in range(1, self.lag_X+1):
-                X[column_name + f'_lag{lag}'] = X[column_name].shift(lag)
-
-        if (y is not None) and self.include_lagged_Y:
-            X['lagged_Y'] = y.copy()
-            for lag in range(1, self.lag_Y+1):
-                X['lagged_Y' + f'_lag{lag}'] = X['lagged_Y'].shift(lag)
-            X = X.iloc[max(self.lag_X, self.lag_Y):] # Remove NaN values
-        else:
-            X = X.iloc[self.lag_X:] # Remove NaN values
-
-        return X
+        return self.lagged_X
 
 class SovEstimator(BaseEstimator, RegressorMixin):
     def __init__(self, cutoff_0=True):
