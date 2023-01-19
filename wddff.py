@@ -4,8 +4,10 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.pipeline import make_pipeline
 from utils import train_val_test_split, normalize_train_val_test_X
+from sklearn.feature_selection import mutual_info_regression
+from itertools import compress
 
-def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max_j = 6, atrous = False, lag_X = 14, lag_Y = 14, normalize = True):
+def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max_j = 6, atrous = False, lag_X = 14, lag_Y = 14, normalize = True, mutual_info_thresh = None):
 
     # X and y should have the same index!!!
 
@@ -25,8 +27,8 @@ def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max
     Y_pipeline = make_pipeline(DwtTransformer(wavelet, j, max_wavelet_length, max_j),
                                LagTransformer(lag_Y))
 
-    X = X_pipeline(X)
-    y = Y_pipeline(y)
+    X = X_pipeline.fit_transform(X)
+    y = Y_pipeline.fit_transform(y)
 
     assert X.shape[0] == y.shape[0]
     assert target_name != 'target'
@@ -55,5 +57,26 @@ def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max
     # Normalize
     if normalize:
         X_train, X_val, X_test = normalize_train_val_test_X(X_train, X_val, X_test)
+
+    # *************************************************************************************
+
+    # mutual_info_thresh is an experimental feature; likely will be removed in the future
+
+    X_colnames = list(X_train)
+
+    # Mutual information input variable selection based on a threshold
+    if mutual_info_thresh is not None:
+        assert (mutual_info_thresh < 1) and (mutual_info_thresh > 0)
+        scores = mutual_info_regression(X_train.to_numpy(), y_train.to_numpy().squeeze())
+        boolean_mask = [score > mutual_info_thresh for score in scores.tolist()]
+        X_train = X_train.loc[:, boolean_mask]
+        X_val = X_val.loc[:, boolean_mask]
+        X_test = X_test.loc[:, boolean_mask]
+        # print(f'Input features: {list(compress(X_colnames, boolean_mask))}')
+        print(list(X_train))
+    else:
+        print(f'Input features: {X_colnames}')
+
+    # *************************************************************************************
 
     return X_train, X_val, X_test, y_train, y_val, y_test
