@@ -99,6 +99,7 @@ def ts_train_val_test(X, y, lead_time, look_back, normalize = False, mutual_info
 
     # Mutual information input variable selection based on a threshold
     if mutual_info_thresh is not None:
+        assert (mutual_info_thresh < 1) and (mutual_info_thresh > 0)
         scores = mutual_info_regression(X, y)
         boolean_mask = [score > mutual_info_thresh for score in scores.tolist()]
         boolean_mask = np.array(boolean_mask)
@@ -142,16 +143,16 @@ def ts_train_val_test(X, y, lead_time, look_back, normalize = False, mutual_info
 
 def nse(obs, pred):
 
-    assert isinstance(obs, np.array)
-    assert isinstance(pred, np.array)
+    assert isinstance(obs, np.ndarray)
+    assert isinstance(pred, np.ndarray)
 
-    assert obs.shape[1] != 1
-    assert pred.shape[1] != 1
+    assert len(obs.shape) == 1
+    assert len(pred.shape) == 1
 
     numerator = np.sum(np.square(obs - pred))
     denominator = np.sum(np.square(obs - np.mean(obs)))
 
     nash = 1 - (numerator/denominator)
 
-    return nash[0]
+    return nash
 
