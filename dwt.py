@@ -224,7 +224,24 @@ class SovEstimator(BaseEstimator, RegressorMixin):
         # check_is_fitted(self)
         X = check_array(X)
 
-        res = np.matmul(self.Xtc, self.H)
+        n_cols = X.shape[1]
+        combns = list(itertools.combinations(range(1,n_cols+self.order), self.order))
+        combns = [(i, j-self.order+1) for i, j in combns]
+
+        res = np.zeros((X.shape[0], len(combns)))
+
+        for i in range(len(combns)):
+            current_combn = combns[i]
+            current_col_1, current_col_2 = current_combn
+            current_col_1 = current_col_1 - 1
+            current_col_2 = current_col_2 - 1
+            temp = np.multiply(X[:, current_col_1], X[:, current_col_2])
+            res[:, i] = temp
+
+        Xt = np.hstack((X, res))
+        Xtc = np.column_stack((np.ones(X.shape[0]), Xt))
+
+        res = np.matmul(Xtc, self.H)
 
         if self.cutoff_0:
             res = res.clip(min=0)
