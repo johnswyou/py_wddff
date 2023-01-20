@@ -275,4 +275,4 @@ def pcis_bic(X, y):
 
     ''')
 
-    return X.loc[:, list(selected_inputs)]
+    return list(selected_inputs)
