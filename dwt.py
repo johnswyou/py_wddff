@@ -4,6 +4,11 @@ from sklearn.utils.validation import check_array, check_X_y
 from sklearn.base import BaseEstimator, TransformerMixin, RegressorMixin
 import pandas as pd
 import itertools
+from rpy2 import robjects as ro
+from rpy2.robjects import numpy2ri
+from rpy2.robjects import pandas2ri
+numpy2ri.activate()
+pandas2ri.activate()
 
 class Dwt:
 
@@ -247,4 +252,27 @@ class SovEstimator(BaseEstimator, RegressorMixin):
             res = res.clip(min=0)
 
         return res
+
+# NOTE: For below, must have hydroIVS package installed in your local R. This can be done via
+#       devtools::install_github("johnswyou/hydroIVS")
         
+def pcis_bic(X, y):
+
+    if not isinstance(X, pd.DataFrame):
+        raise ValueError(f'X must be of type pd.DataFrame, not {type(X)}')
+
+    if not isinstance(y, pd.DataFrame):
+        raise ValueError(f'y must be of type pd.DataFrame, not {type(y)}')
+
+    ro.globalenv['X'] = X
+    ro.globalenv['y'] = y.to_numpy().squeeze()
+
+    selected_inputs = ro.r('''
+
+    out <- hydroIVS::ivsIOData(y, X, ivsm = "pcis_bic")
+    # out$sel_inputs - 1
+    out$names_sel_inputs
+
+    ''')
+
+    return X.loc[:, list(selected_inputs)]
