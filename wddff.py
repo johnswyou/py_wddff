@@ -74,8 +74,8 @@ def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max
         X_test = X_test.loc[:, boolean_mask]
         # print(f'Input features: {list(compress(X_colnames, boolean_mask))}')
         print(list(X_train))
-    else:
-        print(f'Input features: {X_colnames}')
+    # else:
+    #     print(f'Input features: {X_colnames}')
 
     # *************************************************************************************
 
