@@ -7,7 +7,7 @@ from utils import train_val_test_split, normalize_train_val_test_X
 from sklearn.feature_selection import mutual_info_regression
 from itertools import compress
 
-def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max_j = 6, atrous = False, lag_X = 14, lag_Y = 14, normalize = True, mutual_info_thresh = None):
+def single_config_wddff(X, y, leadtime, wavelet = None, j = None, max_wavelet_length = 14, max_j = 6, atrous = False, lag_X = 14, lag_Y = 14, normalize = True, mutual_info_thresh = None):
 
     # X and y should have the same index!!!
 
@@ -21,11 +21,17 @@ def single_config_wddff(X, y, leadtime, wavelet, j, max_wavelet_length = 14, max
 
     # MODWT and lag
 
-    X_pipeline = make_pipeline(DwtTransformer(wavelet, j, max_wavelet_length, max_j),
-                               LagTransformer(lag_X))
+    if wavelet is None or j is None:
 
-    Y_pipeline = make_pipeline(DwtTransformer(wavelet, j, max_wavelet_length, max_j),
-                               LagTransformer(lag_Y))
+        X_pipeline = make_pipeline(LagTransformer(lag_X))
+        Y_pipeline = make_pipeline(LagTransformer(lag_Y))
+
+    else:
+        X_pipeline = make_pipeline(DwtTransformer(wavelet, j, max_wavelet_length, max_j),
+                                LagTransformer(lag_X))
+
+        Y_pipeline = make_pipeline(DwtTransformer(wavelet, j, max_wavelet_length, max_j),
+                                LagTransformer(lag_Y))
 
     X = X_pipeline.fit_transform(X)
     y = Y_pipeline.fit_transform(y)
