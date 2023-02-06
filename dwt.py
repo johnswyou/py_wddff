@@ -108,7 +108,7 @@ class Dwt:
         return W
 
 class DwtTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, wavelet, j, max_wavelet_length, max_j, atrous = False, remove_boundary_coefs = True): # no *args or **kargs
+    def __init__(self, wavelet, j, max_wavelet_length, max_j, atrous = False, remove_boundary_coefs = True, keep_original = True): # no *args or **kargs
 
         self.wavelet = wavelet
         self.j = j
@@ -116,6 +116,7 @@ class DwtTransformer(BaseEstimator, TransformerMixin):
         self.max_j = max_j
         self.atrous = atrous
         self.remove_boundary_coefs = remove_boundary_coefs
+        self.keep_original = keep_original
 
     def fit(self, X, y=None): # y is ignored
 
@@ -137,7 +138,10 @@ class DwtTransformer(BaseEstimator, TransformerMixin):
         # 1. performs MODWT on every column of X and 
         # 2. concatenates the new wavelet features to the original X.
 
-        storage = [X]
+        if self.keep_original:
+            storage = [X]
+        else:
+            storage = []
 
         for i in range(len(self.X_colnames)):
             x = X.iloc[:, i].tolist()                                                                     # take the ith column (time series) in X and convert to a list
